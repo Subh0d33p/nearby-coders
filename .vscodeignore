@@ -4,6 +4,6 @@
 node_modules
 src/**
 scripts/**
-.vscode/**
-tsconfig*.json
+webview/*.ts
 *.map
+tsconfig*.json

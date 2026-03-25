@@ -3,9 +3,13 @@
   "displayName": "Nearby Coders",
   "description": "A VS Code sidebar extension for discovering nearby developers.",
   "version": "0.0.1",
-  "publisher": "local",
+  "publisher": "Subh0d33p",
   "icon": "media/icon.png",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Subh0d33p/nearby-coders.git"
+  },
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -22,8 +26,8 @@
       "activitybar": [
         {
           "id": "nearbyCoders",
-      "title": "Nearby Coders",
-      "icon": "media/icon.png"
+          "title": "Nearby Coders",
+          "icon": "media/icon.png"
         }
       ]
     },
@@ -80,7 +84,7 @@
     "typecheck": "npm run build",
     "verify": "node scripts/verify-project.mjs",
     "test": "npm run verify",
-    "build": "tsc -p tsconfig.extension.json && tsc -p tsconfig.webview.json",
+    "build": "node scripts/build.mjs",
     "watch": "tsc -watch -p tsconfig.extension.json",
     "vscode:prepublish": "npm run build",
     "package": "npx @vscode/vsce package"
@@ -89,9 +93,10 @@
     "@supabase/supabase-js": "^2.49.4"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.6.2",
     "@types/node": "^22.13.10",
     "@types/vscode": "^1.96.0",
+    "@vscode/vsce": "^3.6.2",
+    "esbuild": "^0.27.4",
     "typescript": "^5.8.2"
   }
 }
