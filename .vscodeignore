@@ -1,0 +1,9 @@
+.env
+.env.*
+.gitignore
+node_modules
+src/**
+scripts/**
+.vscode/**
+tsconfig*.json
+*.map

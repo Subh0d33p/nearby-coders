@@ -1,0 +1,97 @@
+{
+  "name": "nearby-coders",
+  "displayName": "Nearby Coders",
+  "description": "A VS Code sidebar extension for discovering nearby developers.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:nearbyCoders.sidebar"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nearbyCoders",
+      "title": "Nearby Coders",
+      "icon": "media/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "nearbyCoders": [
+        {
+          "id": "nearbyCoders.sidebar",
+          "name": "Nearby Coders",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Nearby Coders",
+      "properties": {
+        "nearbyCoders.supabaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase project URL."
+        },
+        "nearbyCoders.supabaseAnonKey": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase anonymous API key."
+        },
+        "nearbyCoders.supabaseExchangeUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Secure backend or Edge Function URL used to exchange the GitHub identity for a Supabase session."
+        },
+        "nearbyCoders.defaultRadiusMeters": {
+          "type": "number",
+          "default": 50000,
+          "description": "Default search radius for nearby coders."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "nearbyCoders.refresh",
+        "title": "Nearby Coders: Refresh"
+      },
+      {
+        "command": "nearbyCoders.login",
+        "title": "Nearby Coders: Login with GitHub"
+      },
+      {
+        "command": "nearbyCoders.logout",
+        "title": "Nearby Coders: Logout"
+      }
+    ]
+  },
+  "scripts": {
+    "typecheck": "npm run build",
+    "verify": "node scripts/verify-project.mjs",
+    "test": "npm run verify",
+    "build": "tsc -p tsconfig.extension.json && tsc -p tsconfig.webview.json",
+    "watch": "tsc -watch -p tsconfig.extension.json",
+    "vscode:prepublish": "npm run build",
+    "package": "npx @vscode/vsce package"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
+    "@types/node": "^22.13.10",
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.8.2"
+  }
+}
