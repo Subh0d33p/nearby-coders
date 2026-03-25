@@ -2,7 +2,7 @@
   "name": "nearby-coders",
   "displayName": "Nearby Coders",
   "description": "A VS Code sidebar extension for discovering nearby developers.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "Subh0d33p",
   "icon": "media/icon.png",
   "license": "MIT",

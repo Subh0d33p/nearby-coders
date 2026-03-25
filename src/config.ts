@@ -1,22 +1,31 @@
 import * as vscode from "vscode";
 
-export interface NearbyCodersConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  supabaseExchangeUrl: string;
-  defaultRadiusMeters: number;
-}
+const DEFAULT_SUPABASE_URL =
+  "https://fuhphtalkwbpajwclex.supabase.co";
 
-export function getNearbyCodersConfig(): NearbyCodersConfig {
-  const configuration = vscode.workspace.getConfiguration("nearbyCoders");
-  const env = process.env;
+const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1aHBodGFsa3dicGFqdndjbGV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODg4NzUsImV4cCI6MjA4OTg2NDg3NX0.-_c72Zpe0yARJPljZoiw28p52fduQg1GJkfMx-cayCQ";
+
+const DEFAULT_EXCHANGE_URL =
+  "https://fuhphtalkwbpajwclex.supabase.co/functions/v1/github-exchange";
+
+export function getNearbyCodersConfig() {
+  const config = vscode.workspace.getConfiguration("nearbyCoders");
 
   return {
-    supabaseUrl: configuration.get<string>("supabaseUrl", "").trim() || env.NEARBY_CODERS_SUPABASE_URL?.trim() || "",
+    supabaseUrl:
+      config.get<string>("supabaseUrl") ||
+      DEFAULT_SUPABASE_URL,
+
     supabaseAnonKey:
-      configuration.get<string>("supabaseAnonKey", "").trim() || env.NEARBY_CODERS_SUPABASE_ANON_KEY?.trim() || "",
+      config.get<string>("supabaseAnonKey") ||
+      DEFAULT_SUPABASE_ANON_KEY,
+
     supabaseExchangeUrl:
-      configuration.get<string>("supabaseExchangeUrl", "").trim() || env.NEARBY_CODERS_SUPABASE_EXCHANGE_URL?.trim() || "",
-    defaultRadiusMeters: configuration.get<number>("defaultRadiusMeters", Number(env.NEARBY_CODERS_DEFAULT_RADIUS_METERS) || 50000)
+      config.get<string>("supabaseExchangeUrl") ||
+      DEFAULT_EXCHANGE_URL,
+
+    defaultRadiusMeters:
+      config.get<number>("defaultRadiusMeters") ?? 50000
   };
 }
