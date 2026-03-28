@@ -58,8 +58,19 @@ export type WebviewIncomingMessage =
   | { type: "ready" }
   | { type: "login" }
   | { type: "logout" }
-  | { type: "saveProfile"; payload: { cityQuery: string; skillsInput: string; onlineStatus: boolean } }
-  | { type: "refreshNearby"; payload?: { radiusMeters?: number } };
+  | {
+      type: "saveProfile";
+      payload: {
+        cityQuery: string;
+        skillsInput: string;
+        onlineStatus: boolean;
+      };
+    }
+  | {
+      type: "refreshNearby";
+      payload?: { radiusMeters?: number };
+    }
+ | { type: "autoLocation" };
 
 export type WebviewOutgoingMessage =
   | { type: "state"; payload: SessionState }

@@ -31,9 +31,16 @@ type OutgoingMessage =
   | { type: "ready" }
   | { type: "login" }
   | { type: "logout" }
-  | { type: "saveProfile"; payload: { cityQuery: string; skillsInput: string; onlineStatus: boolean } }
-  | { type: "refreshNearby"; payload?: { radiusMeters?: number } };
-
+  | {
+      type: "saveProfile";
+      payload: {
+        cityQuery: string;
+        skillsInput: string;
+        onlineStatus: boolean;
+      };
+    }
+  | { type: "refreshNearby"; payload?: { radiusMeters?: number } }
+ | { type: "autoLocation" };
 declare function acquireVsCodeApi(): {
   postMessage(message: OutgoingMessage): void;
 };
@@ -115,11 +122,25 @@ function render(): void {
   </span>
 </div>
         <label>
-          <span>City</span>
-          <input id="cityQuery" type="text" placeholder="Bengaluru, India" value="${escapeHtml(
-    formatLocation(state.profile)
-  )}" ${loading || !state.isAuthenticated ? "disabled" : ""} />
-        </label>
+  <span>City</span>
+  <input
+    id="cityQuery"
+    type="text"
+    placeholder="Bengaluru, India"
+    value="${escapeHtml(
+      formatLocation(state.profile)
+    )}"
+    ${loading || !state.isAuthenticated ? "disabled" : ""}
+  />
+
+  <button
+    class="secondary"
+    data-action="detectLocation"
+    ${loading || !state.isAuthenticated ? "disabled" : ""}
+  >
+    Detect Location
+  </button>
+</label>
         <label>
           <span>Skills</span>
           <input id="skillsInput" type="text" placeholder="TypeScript, Rust, Postgres" value="${escapeHtml(
@@ -208,6 +229,11 @@ function bindEvents(): void {
       payload: { cityQuery, skillsInput, onlineStatus }
     });
   });
+  document
+    .querySelector<HTMLElement>('[data-action="detectLocation"]')
+    ?.addEventListener("click", () => {
+      detectLocation();
+    });
 }
 
 function formatDistance(distanceMeters: number): string {
@@ -264,4 +290,10 @@ function formatLastSeen(lastSeen: string | null): string {
   if (hr < 24) return `${hr} h ago`;
 
   return `${days} d ago`;
+}
+
+function detectLocation() {
+  vscode.postMessage({
+    type: "autoLocation"
+  });
 }

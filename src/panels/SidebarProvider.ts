@@ -10,6 +10,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private readonly authService = new AuthService();
+
   private state: SessionState = {
     isAuthenticated: false,
     profile: null,
@@ -20,15 +21,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private supabaseAccessToken?: string;
   private supabaseUserId?: string;
 
-  public constructor(
+  constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly extensionUri: vscode.Uri
   ) {}
 
   public resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    _context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
+    webviewView: vscode.WebviewView
   ): void {
     this.view = webviewView;
     const { webview } = webviewView;
@@ -42,18 +41,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     };
 
     webview.html = this.getHtml(webview);
+
     webview.onDidReceiveMessage((message: WebviewIncomingMessage) => {
       void this.handleMessage(message);
     });
   }
 
-  public async login(): Promise<void> {
+  // ---------------- AUTH ----------------
+
+  async login(): Promise<void> {
     await this.setLoading(true);
     try {
       const githubIdentity = await this.authService.loginWithGithub({
         forceNewSession: this.state.isAuthenticated
       });
-      const supabaseSession = await this.authService.exchangeGithubForSupabase(githubIdentity);
+
+      const supabaseSession =
+        await this.authService.exchangeGithubForSupabase(githubIdentity);
+
       this.supabaseAccessToken = supabaseSession.accessToken;
       this.supabaseUserId = supabaseSession.userId;
 
@@ -69,6 +74,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
       await this.pushState();
       this.toast("Signed in with GitHub.", "success");
+
     } catch (error) {
       this.toast(this.formatError(error), "error");
     } finally {
@@ -76,9 +82,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public async logout(): Promise<void> {
+  async logout(): Promise<void> {
     this.supabaseAccessToken = undefined;
     this.supabaseUserId = undefined;
+
     this.state = {
       isAuthenticated: false,
       profile: null,
@@ -88,143 +95,71 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     await this.authService.logoutFromGithub();
     await this.pushState();
-    this.toast("Signed out from Nearby Coders. Your VS Code GitHub account may still remain available globally.", "info");
+    this.toast("Signed out.", "info");
   }
 
-  public async refreshNearby(
-  radiusMeters = getNearbyCodersConfig().defaultRadiusMeters
-): Promise<void> {
+  // ---------------- NEARBY ----------------
 
-  if (!this.supabaseUserId) {
-    this.toast("Login first to refresh nearby coders.", "error");
-    return;
-  }
+  async refreshNearby(
+    radiusMeters = getNearbyCodersConfig().defaultRadiusMeters
+  ): Promise<void> {
 
-  await this.setLoading(true);
-
-  try {
-
-    const repository = this.getRepository();
-
-    const profile = await repository.getMyProfile(
-      this.supabaseUserId
-    );
-
-    if (!profile?.city || !profile.country) {
-      throw new Error(
-        "Complete your profile and location before searching nearby coders."
-      );
-    }
-
-    const location = await geocodeCity(
-      `${profile.city}, ${profile.country}`
-    );
-
-    // ✅ update last_seen here
-    await repository.upsertProfile(
-      this.supabaseUserId,
-      {
-        username: profile.username ?? "",
-        avatar_url: profile.avatar_url ?? "",
-        github_id: profile.github_id ?? "",
-        city: profile.city ?? "",
-        country: profile.country ?? "",
-        skills: profile.skills ?? [],
-        online_status: profile.online_status ?? false,
-        last_seen: new Date().toISOString(),
-        coordinates: {
-          latitude: location.latitude,
-          longitude: location.longitude
-        }
-      }
-    );
-
-    const nearbyCoders =
-      await repository.matchCoders(
-        location.latitude,
-        location.longitude,
-        radiusMeters
-      );
-
-    this.state = {
-      ...this.state,
-      profile,
-      nearbyCoders
-    };
-
-    await this.pushState();
-
-  } catch (error) {
-
-    this.toast(
-      this.formatError(error),
-      "error"
-    );
-
-  } finally {
-
-    await this.setLoading(false);
-
-  }
-}
-
-  private async handleMessage(message: WebviewIncomingMessage): Promise<void> {
-    switch (message.type) {
-      case "ready":
-        await this.pushState();
-        break;
-      case "login":
-        await this.login();
-        break;
-      case "logout":
-        await this.logout();
-        break;
-      case "saveProfile":
-        await this.saveProfile(message.payload.cityQuery, message.payload.skillsInput, message.payload.onlineStatus);
-        break;
-      case "refreshNearby":
-        await this.refreshNearby(message.payload?.radiusMeters ?? getNearbyCodersConfig().defaultRadiusMeters);
-        break;
-      default:
-        break;
-    }
-  }
-
-  private async saveProfile(cityQuery: string, skillsInput: string, onlineStatus: boolean): Promise<void> {
     if (!this.supabaseUserId) {
-      this.toast("Login first to save your profile.", "error");
+      this.toast("Login first.", "error");
       return;
     }
 
     await this.setLoading(true);
+
     try {
-      const githubIdentity = await this.authService.loginWithGithub();
-      const location = await geocodeCity(cityQuery);
       const repository = this.getRepository();
 
-      const profile = await repository.upsertProfile(this.supabaseUserId, {
-        username: githubIdentity.username,
-        avatar_url: githubIdentity.avatarUrl,
-        github_id: githubIdentity.githubUserId,
-        city: location.city,
-        country: location.country,
-        skills: normalizeSkills(skillsInput),
-        online_status: onlineStatus,
-        last_seen: new Date().toISOString(),
-        coordinates: {
-          latitude: location.latitude,
-          longitude: location.longitude
+      const profile = await repository.getMyProfile(
+        this.supabaseUserId
+      );
+
+      if (!profile?.city || !profile.country) {
+        throw new Error("Complete your profile first.");
+      }
+
+      const location = await geocodeCity(
+        `${profile.city}, ${profile.country}`
+      );
+
+      // update last_seen
+      await repository.upsertProfile(
+        this.supabaseUserId,
+        {
+          username: profile.username ?? "",
+          avatar_url: profile.avatar_url ?? "",
+          github_id: profile.github_id ?? "",
+          city: profile.city ?? "",
+          country: profile.country ?? "",
+          skills: profile.skills ?? [],
+          online_status: profile.online_status ?? false,
+          last_seen: new Date().toISOString(),
+          coordinates: {
+            latitude: location.latitude,
+            longitude: location.longitude
+          }
         }
-      });
+      );
+
+      const nearbyCoders =
+        await repository.matchCoders(
+          location.latitude,
+          location.longitude,
+          radiusMeters
+        );
 
       this.state = {
         ...this.state,
-        isAuthenticated: true,
-        profile
+        profile,
+        nearbyCoders
       };
 
       await this.pushState();
-      this.toast(`Profile saved for ${location.displayName}.`, "success");
+
     } catch (error) {
       this.toast(this.formatError(error), "error");
     } finally {
@@ -232,32 +167,175 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getRepository(): NearbyCodersRepository {
-    return new NearbyCodersRepository(this.supabaseAccessToken);
+  // ---------------- MESSAGE HANDLER ----------------
+
+  private async handleMessage(
+    message: WebviewIncomingMessage
+  ): Promise<void> {
+
+    switch (message.type) {
+
+      case "ready":
+        await this.pushState();
+        break;
+
+      case "login":
+        await this.login();
+        break;
+
+      case "logout":
+        await this.logout();
+        break;
+
+      case "saveProfile":
+        await this.saveProfile(
+          message.payload.cityQuery,
+          message.payload.skillsInput,
+          message.payload.onlineStatus
+        );
+        break;
+
+      case "refreshNearby":
+        await this.refreshNearby(
+          message.payload?.radiusMeters ??
+          getNearbyCodersConfig().defaultRadiusMeters
+        );
+        break;
+
+      // 🔥 AUTO LOCATION
+      case "autoLocation": {
+
+        if (!this.supabaseUserId) {
+          this.toast("Login first.", "error");
+          return;
+        }
+
+        await this.setLoading(true);
+
+        try {
+          const res = await fetch("https://ipinfo.io/json");
+          const data = await res.json();
+
+          if (!data.loc) {
+            throw new Error("Could not detect location");
+          }
+
+          const [lat, lng] =
+            data.loc.split(",").map(Number);
+
+          const repository = this.getRepository();
+
+          const profile = await repository.getMyProfile(
+            this.supabaseUserId
+          );
+
+          await repository.upsertProfile(
+            this.supabaseUserId,
+            {
+              username: profile?.username ?? "",
+              avatar_url: profile?.avatar_url ?? "",
+              github_id: profile?.github_id ?? "",
+              city: data.city,
+              country: data.country,
+              skills: profile?.skills ?? [],
+              online_status: profile?.online_status ?? false,
+              last_seen: new Date().toISOString(),
+              coordinates: {
+                latitude: lat,
+                longitude: lng
+              }
+            }
+          );
+
+          // ✅ ONLY refresh (pushState already inside it)
+          await this.refreshNearby();
+
+          this.toast(
+            "Location detected and nearby coders updated",
+            "success"
+          );
+
+        } catch (error) {
+          console.error("AUTO LOCATION ERROR:", error);
+          this.toast(this.formatError(error), "error");
+        } finally {
+          await this.setLoading(false);
+        }
+
+        break;
+      }
+    }
   }
 
-  private getHtml(webview: vscode.Webview): string {
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "main.js"));
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "webview", "style.css"));
-    const nonce = getNonce();
+  // ---------------- SAVE PROFILE ----------------
 
-    return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"
-    />
-    <link href="${styleUri}" rel="stylesheet" />
-    <title>Nearby Coders</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
-  </body>
-</html>`;
+  private async saveProfile(
+    cityQuery: string,
+    skillsInput: string,
+    onlineStatus: boolean
+  ): Promise<void> {
+
+    if (!this.supabaseUserId) {
+      this.toast("Login first.", "error");
+      return;
+    }
+
+    await this.setLoading(true);
+
+    try {
+      const githubIdentity =
+        await this.authService.loginWithGithub();
+
+      const location = await geocodeCity(cityQuery);
+
+      const repository = this.getRepository();
+
+      const profile = await repository.upsertProfile(
+        this.supabaseUserId,
+        {
+          username: githubIdentity.username,
+          avatar_url: githubIdentity.avatarUrl,
+          github_id: githubIdentity.githubUserId,
+          city: location.city,
+          country: location.country,
+          skills: normalizeSkills(skillsInput),
+          online_status: onlineStatus,
+          last_seen: new Date().toISOString(),
+          coordinates: {
+            latitude: location.latitude,
+            longitude: location.longitude
+          }
+        }
+      );
+
+      this.state = {
+        ...this.state,
+        isAuthenticated: true,
+        profile
+      };
+
+     
+// await this.pushState();
+
+// ✅ auto refresh nearby
+await this.refreshNearby();
+
+this.toast(
+  `Profile saved for ${location.displayName}`,
+  "success"
+);
+
+    } catch (error) {
+      this.toast(this.formatError(error), "error");
+    } finally {
+      await this.setLoading(false);
+    }
+  }
+
+  // ---------------- UTIL ----------------
+
+  private getRepository(): NearbyCodersRepository {
+    return new NearbyCodersRepository(this.supabaseAccessToken);
   }
 
   private async pushState(): Promise<void> {
@@ -275,45 +353,69 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private postMessage(message: WebviewOutgoingMessage): void {
-    void this.view?.webview.postMessage(message);
+    this.view?.webview.postMessage(message);
   }
 
-  private toast(message: string, level: "info" | "error" | "success"): void {
+  private toast(
+    message: string,
+    level: "info" | "error" | "success"
+  ): void {
+
     this.postMessage({
       type: "toast",
       payload: { message, level }
     });
 
     if (level === "error") {
-      void vscode.window.showErrorMessage(message);
+      vscode.window.showErrorMessage(message);
     } else if (level === "success") {
-      void vscode.window.showInformationMessage(message);
+      vscode.window.showInformationMessage(message);
     }
   }
 
   private formatError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
+    return error instanceof Error
+      ? error.message
+      : "Unexpected error";
+  }
 
-    return "An unexpected error occurred.";
+  private getHtml(webview: vscode.Webview): string {
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "main.js")
+    );
+
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "webview", "style.css")
+    );
+
+    const nonce = getNonce();
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Security-Policy"
+content="
+default-src 'none';
+img-src ${webview.cspSource} https: data:;
+style-src ${webview.cspSource} 'unsafe-inline';
+script-src 'nonce-${nonce}';
+connect-src https:;
+"/>
+<link href="${styleUri}" rel="stylesheet"/>
+</head>
+<body>
+<div id="app"></div>
+<script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
   }
 }
 
 function normalizeSkills(input: string): string[] {
-  return input
-    .split(",")
-    .map((skill) => skill.trim())
-    .filter(Boolean);
+  return input.split(",").map(s => s.trim()).filter(Boolean);
 }
 
 function getNonce(length = 32): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-
-  for (let index = 0; index < length; index += 1) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  return result;
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
